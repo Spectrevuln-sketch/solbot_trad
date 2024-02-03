@@ -1,0 +1,18 @@
+version: "3.7"
+services:
+  bot_solana:
+    build:
+      context: .
+    restart: always
+    ports:
+      - 5777:5777
+    volumes:
+      - .:/src
+    env_file:
+      - .env
+    networks:
+      - sevira-network
+
+networks:
+  sevira-network:
+    external: true
