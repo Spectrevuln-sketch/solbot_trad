@@ -16,7 +16,8 @@ def StartBot(update: telegram.Update, context: CallbackContext) -> None:
             user = GetCurrentUser(user_message_info.id)
             if user is None:
                 CreateUser(user_message_info)
-                SolanaHandler.GenerateAccountCli(user_message_info.id)
+                # SolanaHandler.GenerateAccountCli(user_message_info.id)
+                SolanaHandler.MakeWalletFirst(user_message_info.id)
             wallet = GetCurrentWallet(user_message_info.id)
             if wallet is None:
                 return logging.error('Wallet not found')

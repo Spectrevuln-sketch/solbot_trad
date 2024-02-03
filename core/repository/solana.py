@@ -273,6 +273,39 @@ class SolanaHandler():
       except Exception as e:
           print(f'Error: {e}')
 
+  @classmethod
+  def MakeWalletFirst(cls, chat_id):
+    with CruserSolana() as solana_client:
+      if solana_client.is_connected():
+        pair_byte = Keypair()
+        private_key = base58.b58encode(bytes(pair_byte)).decode()
+        public_key = pair_byte.pubkey()
+        wallet_key_address = private_key
+        print(f'PUBLIC KEY {public_key}')
+
+        user = GetCurrentUser(chat_id)
+        if user is not None:
+            balance = solana_client.get_balance(pubkey=public_key).value
+            payload ={
+                'tele_id': user[4],
+                'private_key': wallet_key_address,
+                'public_key': str(public_key),
+                'is_connected': True,
+                'balance': balance,
+                'default': True
+            }
+            print(f'payload data {payload}')
+            NewWalletUser(payload)
+            wallet_info = (
+                  f"New Wallet Info:\n"
+                  f"Address: {public_key}\n"
+                  f"Private key: {wallet_key_address}"
+              )
+            return wallet_info
+      else:
+        print('Cannot Connect to solana')
+        return None
+
 # Connect Wallet data
   @classmethod
   def ConnectWallet(cls, chat_id, private_key):
