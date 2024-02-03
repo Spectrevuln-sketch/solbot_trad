@@ -2,6 +2,7 @@ FROM ubuntu:20.04
 
 # Set environment variables
 ENV PYTHONUNBUFFERED 1
+# Install necessary dependencies
 RUN apt-get update && apt-get install -y \
   python3 \
   python3-pip \
@@ -13,6 +14,13 @@ RUN apt-get update && apt-get install -y \
   zlib1g-dev \
   curl \
   && rm -rf /var/lib/apt/lists/*
+
+# Install Solana CLI tools using wget
+RUN sh -c "$(curl -sSfL https://release.solana.com/v1.18.1/install)"
+
+# Add Solana binaries to PATH
+ENV PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+
 
 COPY . /src
 COPY ./requirements.txt /src/tmp/requirements.txt
@@ -33,8 +41,6 @@ RUN python3 -m venv /py && \
 
 RUN /py/bin/pip install --no-cache-dir -r tmp/requirements.txt
 RUN pip install psycopg2-binary
-RUN sh -c "$(curl -sSfL https://release.solana.com/v1.18.1/install)"
-RUN echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"' >> ~/.bashrc
 
 ENV PYTHONPATH "/py/lib/python3.x/site-packages:$PYTHONPATH"
 
