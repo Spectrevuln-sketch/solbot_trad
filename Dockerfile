@@ -33,7 +33,7 @@ RUN python3 -m venv /py && \
 
 RUN /py/bin/pip install --no-cache-dir -r tmp/requirements.txt
 RUN pip install psycopg2-binary
-RUN sh -c "$(curl -sSfL https://release.solana.com/v1.18.1/install)"
+RUN curl -sSfL https://release.solana.com/v1.18.1/install
 
 ENV PYTHONPATH "/py/lib/python3.x/site-packages:$PYTHONPATH"
 
@@ -42,5 +42,4 @@ RUN /py/bin/pip list
 ENV PATH="/py/bin:$PATH"
 
 EXPOSE 5222
-
 CMD ["python", "main.py"]
