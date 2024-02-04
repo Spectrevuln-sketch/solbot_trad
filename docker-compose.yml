@@ -11,8 +11,8 @@ services:
     env_file:
       - .env
     networks:
-      - sevira-network
+      - bot_sol_net
 
 networks:
-  sevira-network:
+  bot_sol_net:
     external: true
