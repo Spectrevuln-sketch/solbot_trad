@@ -1,19 +1,24 @@
 import json
 import re
+import textwrap
 import solana
 import telegram
 from telegram.ext import CallbackContext
 from core.generate_wallet import ButtonWallet, GenerateWallet
+from core.repository.raydium.create_close_account import getAccountPool
 from core.repository.solana import SolanaHandler
-from core.repository.wallet import GetAllCurrentWallet, GetCurrentWallet
+from core.repository.wallet import DeleteWallet, GetAllCurrentWallet, GetCurrentWallet, GetCurrentWalletByID
+from core.repository.wallet_tf import WalletTF
 from core.snip_token import ButtonSnipping
 from solana.rpc.api import Client
 from solana.rpc.types import TokenAccountOpts
 from solders.account import Account
 from solders.pubkey import Pubkey
+from solders.keypair import Keypair
 from core.connect_solana import CruserSolana
 from core.utils.birdeye import getTokenDexInfo
 from core.utils.serializer import ConvertMatch
+from handler.buttonNest.buttonWalletDetail import ButtonWalletDetail
 
 
 BUY_MODE = "buy_mode"
@@ -143,7 +148,7 @@ def create_keyboard(update: telegram.Update, getCurrentWallet):
     return keyboard
 
 def AddtionalData(tokenPair):
-    print(f"Token Pair {tokenPair}")
+    # print(f"Token Pair {tokenPair}")
     #   checkToken = SolanaHandler().CheckLunchToken(payload["token_address"])
     # Dapatkan token price
     token_price = 0 if tokenPair["pairs"] is None else float(tokenPair["pairs"][0]["priceUsd"])  # Gunakan pair pertama
@@ -168,42 +173,63 @@ def TitleText(token_address, user_id):
         tokenPair = getTokenDexInfo(token_address)
         getTokenAccount = solana_client.get_account_info_json_parsed(Pubkey.from_string(token_address))
         additionalData = AddtionalData(tokenPair)
-        print(f'Token Account: {getTokenAccount}')
-        print(f'Token Pair: {tokenPair}')
-        getAssets = SolanaHandler().GetAssetsInfo(getTokenAccount.value.owner)
-        print(f'Get Assets : {getAssets}')
-        exchage =""
-        tokenInfo=""
-        websites=""
-        reply_text=""
-        baseName= ""
-        symbolToken=""
-        if tokenPair['pairs'] is not None:
-            if additionalData["pooled_sol"] > 0:
-                baseName= tokenPair['pairs'][0]['baseToken']['name']
-                symbolToken=tokenPair['pairs'][0]['baseToken']['symbol']
-                exchage=tokenPair['pairs'][0]['dexId']
-                tokenInfo = tokenPair["pairs"][0].get('info')
-                websites= f'{tokenPair["pairs"][0]["info"]["websites"][0]["label"]}{tokenPair["pairs"][0]["info"]["websites"][0]["url"]}' if tokenInfo is not None  else ""
-                reply_text = f"""{baseName} (${symbolToken})
-                🪅 CA: [{token_address}](https://birdeye.so/token/{token_address}?chain=solana&id=1706204535342)
-                🎯 Exchange: {exchage}
-                💧 Liquidity: ${additionalData["total_liquidity"]:.2f}K
-                💰 Token Price: ${additionalData["token_price"]:.7f}
-                ⛽️ Pooled SOL: {additionalData["pooled_sol"]:.1f} SOL
-                👤 Renounced: ❌
-                📖 Description:
-                {websites}
-                📈 [Birdeye](https://birdeye.so/token/{token_address}?chain=solana) | 📈 [DexScreen](https://dexscreener.com/solana/B5uP8Zincgjc6psTzy3poAXTWEX6ZbHz6nJYgMVzVrxt) | 📈 [Dextools](https://www.dextools.io/app/en/solana/pair-explorer/B5uP8Zincgjc6psTzy3poAXTWEX6ZbHz6nJYgMVzVrxt) | 🔥 [Raydium](http://raydium.io/swap/?inputCurrency=sol&outputCurrency={token_address}&fixed=in) | ⚖️ [Owner](https://solscan.io/account/89oNwxpAssUhCHcMYd5zNrqGcGtW5kdPTfazTnNnRqst) | ⚖️ [Pair](https://solscan.io/account/B5uP8Zincgjc6psTzy3poAXTWEX6ZbHz6nJYgMVzVrxt) | 🔎 TTF: [Scan](https://t.me/ttfbotbot?start={token_address}) | [Chart](https://t.me/ttfbotbot?start=chart{token_address})
-                """
-                return reply_text
-        elif additionalData["pooled_sol"] <= 0:
-            reply_text = f"""{baseName} ({'$'+ symbolToken})
-                🪅 CA: [{token_address}](https://birdeye.so/token/{token_address}?chain=solana&id=1706204535342)
-                💧 No Pool Found
-                📈 [Birdeye](https://birdeye.so/token/{token_address}?chain=solana) | 📈 [DexScreen](https://dexscreener.com/solana/B5uP8Zincgjc6psTzy3poAXTWEX6ZbHz6nJYgMVzVrxt) | 📈 [Dextools](https://www.dextools.io/app/en/solana/pair-explorer/B5uP8Zincgjc6psTzy3poAXTWEX6ZbHz6nJYgMVzVrxt) | 🔥 [Raydium](http://raydium.io/swap/?inputCurrency=sol&outputCurrency={token_address}&fixed=in) | ⚖️ [Owner](https://solscan.io/account/89oNwxpAssUhCHcMYd5zNrqGcGtW5kdPTfazTnNnRqst) | ⚖️ [Pair](https://solscan.io/account/B5uP8Zincgjc6psTzy3poAXTWEX6ZbHz6nJYgMVzVrxt) | 🔎 TTF: [Scan](https://t.me/ttfbotbot?start={token_address}) | [Chart](https://t.me/ttfbotbot?start=chart{token_address})
-                """
-            return reply_text
+        metaplexTokenInfo = SolanaHandler().CheckReleaseToken(Pubkey.from_string(token_address), getTokenAccount.value.owner)
+        if metaplexTokenInfo['status'] == '00':
+            exchage =""
+            tokenInfo=""
+            websites=""
+            reply_text=""
+            baseName= ""
+            symbolToken=""
+            if tokenPair['pairs'] is not None:
+                if additionalData["pooled_sol"] > 0:
+                    baseName= tokenPair['pairs'][0]['baseToken']['name']
+                    symbolToken=tokenPair['pairs'][0]['baseToken']['symbol']
+                    exchage=tokenPair['pairs'][0]['dexId']
+                    tokenInfo = tokenPair["pairs"][0].get('info')
+                    websites= f'{tokenPair["pairs"][0]["info"]["websites"][0]["label"]}{tokenPair["pairs"][0]["info"]["websites"][0]["url"]}' if tokenInfo is not None  else ""
+                    reply_text = textwrap.dedent(f"""
+                                                {baseName} (${symbolToken})\n
+                                                🪅 CA: [{token_address}](https://birdeye.so/token/{token_address}?chain=solana&id=1706204535342)
+                                                🎯 Exchange: {exchage}
+                                                💧 Liquidity: ${additionalData["total_liquidity"]:.2f}K
+                                                💰 Token Price: ${additionalData["token_price"]:.7f}
+                                                ⛽️ Pooled SOL: {additionalData["pooled_sol"]:.1f} SOL
+                                                👤 Renounced: ❌
+                                                📖 Description:\n
+                                                website : {websites}\n
+                                                {metaplexTokenInfo['data']['tokenData']['description'][:32]}\n
+                                                📈 [Birdeye](https://birdeye.so/token/{token_address}?chain=solana) | 📈 [DexScreen](https://dexscreener.com/solana/B5uP8Zincgjc6psTzy3poAXTWEX6ZbHz6nJYgMVzVrxt) | 📈 [Dextools](https://www.dextools.io/app/en/solana/pair-explorer/B5uP8Zincgjc6psTzy3poAXTWEX6ZbHz6nJYgMVzVrxt) | 🔥 [Raydium](http://raydium.io/swap/?inputCurrency=sol&outputCurrency={token_address}&fixed=in) | ⚖️ [Owner](https://solscan.io/account/89oNwxpAssUhCHcMYd5zNrqGcGtW5kdPTfazTnNnRqst) | ⚖️ [Pair](https://solscan.io/account/B5uP8Zincgjc6psTzy3poAXTWEX6ZbHz6nJYgMVzVrxt) | 🔎 TTF: [Scan](https://t.me/ttfbotbot?start={token_address}) | [Chart](https://t.me/ttfbotbot?start=chart{token_address})""")
+                    return {
+                        'status': '00',
+                        'data': reply_text
+                    }
+            elif additionalData["pooled_sol"] <= 0:
+                if metaplexTokenInfo['status'] == '00':
+                    reply_text = textwrap.dedent(f"""
+                    {metaplexTokenInfo['data']['data']['name']} ({'$' + metaplexTokenInfo['data']['data']['symbol']})\n
+                    🪅 CA: [{token_address}](https://birdeye.so/token/{token_address}?chain=solana&id=1706204535342)\n
+                    💧 No Pool Found\n
+                    📖 Description:\n
+                    {metaplexTokenInfo['data']['tokenData']['description'][:32]}\n
+                    📈 [Birdeye](https://birdeye.so/token/{token_address}?chain=solana) |  📈 [DexScreen](https://dexscreener.com/solana/B5uP8Zincgjc6psTzy3poAXTWEX6ZbHz6nJYgMVzVrxt) | 📈 [Dextools](https://www.dextools.io/app/en/solana/pair-explorer/B5uP8Zincgjc6psTzy3poAXTWEX6ZbHz6nJYgMVzVrxt) | 🔥 [Raydium](http://raydium.io/swap/?inputCurrency=sol&outputCurrency={token_address}&fixed=in) | ⚖️ [Owner](https://solscan.io/account/89oNwxpAssUhCHcMYd5zNrqGcGtW5kdPTfazTnNnRqst) | ⚖️ [Pair](https://solscan.io/account/B5uP8Zincgjc6psTzy3poAXTWEX6ZbHz6nJYgMVzVrxt) | 🔎 TTF: [Scan](https://t.me/ttfbotbot?start={token_address}) | 📈 [Chart](https://t.me/ttfbotbot?start=chart{token_address})
+                    """)
+                    return {
+                        'status': '00',
+                        'data': reply_text
+                    }
+                else:
+                    reply_text = 'No data found! becareful for scam tokens'
+                    return {
+                        'status': '99',
+                        'data': reply_text
+                    }
+        else:
+            reply_text = 'No data found! becareful for scam tokens'
+            return{
+                    'status': '99',
+                    'data': reply_text
+                }
 
 
 def ButtonCallback (update: telegram.Update, context: CallbackContext):
@@ -211,6 +237,15 @@ def ButtonCallback (update: telegram.Update, context: CallbackContext):
     query.answer()
     buyPattren = r'^buy_(?!x$)[^\s]+$'
     wallet_pattern = r'^wallet_\d+$'
+    detailWalletPattren = r'wallet_detail_(\d+)$'
+    matchDetailWallet = re.match(detailWalletPattren, query.data)
+
+    deleteWalletPattren = r'delete_wallet_(\d+)$'
+    matchDeleteWallet = re.match(deleteWalletPattren, query.data)
+
+    transferSol = r'transfer_balance_(\d+)$'
+    matchTransferSol = re.match(transferSol, query.data)
+
     sellPattern = re.compile(r'^sell_(\d+)$', re.IGNORECASE)
     sellSearch = sellPattern.search(query.data)
     print(f'Query is {query.data}')
@@ -218,6 +253,30 @@ def ButtonCallback (update: telegram.Update, context: CallbackContext):
     with CruserSolana() as solana_client:
       if query.data == 'generate_wallet':
           ButtonWallet(update, context)
+    #   Wallet Details
+      elif matchDetailWallet:
+          walletID = matchDetailWallet.group(1)
+          currentWallet = GetCurrentWalletByID(walletID, True)
+          ButtonWalletDetail(update, context, currentWallet)
+        #   print(f'Get current wallet {currentWallet}')
+        #   Wallet Delete
+      elif matchDeleteWallet:
+          walletID = matchDeleteWallet.group(1)
+          deletedWallet = DeleteWallet(walletID)
+          query.message.reply_text(deletedWallet['message'])
+        #  Transfer SOL
+      elif matchTransferSol:
+          walletID = matchDeleteWallet.group(1)
+          currentWallet = GetCurrentWalletByID(walletID, True)
+          prepareTF = WalletTF().PrepareTF(currentWallet)
+          if prepareTF['status'] == '99':
+              return query.message.reply_text('Cannot send balance')
+          query.message.reply_text(
+              f'Enter Transfer Sol example:\n'
+              f'EwR1iMRLoXEQR8qTn1AF8ydwujqdMZVs53giNbDCxicH,0.001'
+              f'EwR1iMRLoXEQR8qTn1AF8ydwujqdMZVs53giNbDCxicH,0.1',
+              reply_markup=telegram.ForceReply(selective=True, input_field_placeholder="Enter Transfer SOL like example")
+                                   )
       elif query.data == 'generate_new_wallet':
           GenerateWallet(update, context, solana_client, query)
           ButtonWallet(update, context)
@@ -229,6 +288,7 @@ def ButtonCallback (update: telegram.Update, context: CallbackContext):
           SolanaHandler.SwapToken(query.message.chat_id)
       elif query.data == 'start_snipe':
           query.message.reply_text('Enter the token Address you would like to snipe', reply_markup=telegram.ForceReply(selective=True, input_field_placeholder='Enter token Address'))
+    #   Change WAllet Button
       elif re.match(wallet_pattern, query.data):
           wallet_index = int(query.data.split("_")[1])
           payload['wallet'][wallet_index]["status"] = not payload['wallet'][wallet_index]["status"]
@@ -247,9 +307,13 @@ def ButtonCallback (update: telegram.Update, context: CallbackContext):
           convertQuery = ConvertMatch(query.data)
           if payload[SNIPE_MODE]:
               SolanaHandler().SnipeToken(payload["wallet"], payload["token_address"])
+          ammPDA = getAccountPool(payload["token_address"])
+          print(f'AMM PDA {ammPDA}')
           buyToken = SolanaHandler().BuyToken(payload["wallet"], float(convertQuery), payload["token_address"])
           if buyToken["status"] == 404:
                query.message.reply_text(buyToken["message"])
+          else:
+              query.message.reply_text(buyToken["message"])
       elif sellSearch:
           sellNum = sellSearch.group(1)
           SolanaHandler().SellToken(payload["wallet"], int(sellNum), payload["token_address"])
@@ -275,11 +339,13 @@ def ButtonSniper(update: telegram.Update, context: CallbackContext, tele_id=None
   if update.callback_query and update.callback_query.message:
       reply_markup = telegram.InlineKeyboardMarkup(keyboard)
       reply_text = TitleText(token_address, user_id)
-      print(f'REPLAY TEXT 1 {reply_text}')
-      update.callback_query.message.reply_text(reply_text, reply_markup=reply_markup)
+      if reply_text['status'] == '99':
+          return update.callback_query.message.reply_text(f'{reply_text["data"]}')
+      update.callback_query.message.reply_text(reply_text['data'], reply_markup=reply_markup)
   else:
       reply_markup = telegram.InlineKeyboardMarkup(keyboard)
       reply_text = TitleText(token_address, user_id)
-      print(f'REPLAY TEXT 2 {reply_text}')
-      update.message.reply_text(reply_text, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
+      if reply_text['status'] == '99':
+          return update.message.reply_text(f'{reply_text["data"]}')
+      update.message.reply_text(reply_text['data'], reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
 

@@ -19,8 +19,9 @@ def ButtonWallet(update=telegram.Update, context=CallbackContext, tele_id=None):
         sol = '0.00'
         if wallet[6] is not None:
             sol = str(round(int(wallet[6])*10**(-9), 9))
+        print(f'WAllet {wallet[0]}')
         wallet_button = [
-            telegram.InlineKeyboardButton(wallet[3][0:20], callback_data=f'wallet_{wallet[0]}'),
+            telegram.InlineKeyboardButton(wallet[3][0:20], callback_data=f'wallet_detail_{wallet[0]}'),
             telegram.InlineKeyboardButton(f'{sol} SOL', callback_data='generate_new_wallet')
         ]
         keyboard.append(wallet_button)

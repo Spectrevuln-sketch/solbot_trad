@@ -79,7 +79,13 @@ def BuyToken(TOKEN_TO_SWAP_BUY, payer, amount):
                         print(f"Execution time: {execution_time} seconds")
 
                         checkTxn = False
-                        return txid_string_sig
+                        return {
+                            'status': 200,
+                            'data':{
+                                'txIdSignature':txid_string_sig
+                            },
+                            'message': 'Successfully Transaction'
+                        }
 
                     else:
                         print("Transaction Failed")
@@ -125,7 +131,6 @@ def buy(solana_client, TOKEN_TO_SWAP_BUY, payer, amount):
     lamports_amm = amount * LAMPORTS_PER_SOL
     amount_in =  int(lamports_amm - (lamports_amm * (slippage/100)))
 
-    return print(f"POOOL KEYS {amount_in}")
     txnBool = True
     while txnBool:
 

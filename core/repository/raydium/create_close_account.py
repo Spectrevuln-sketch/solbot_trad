@@ -5,6 +5,7 @@ from solders.instruction import Instruction
 
 from solana.rpc.types import TokenAccountOpts
 from solana.transaction import AccountMeta
+from core.connect_solana import CruserSolana
 
 from core.repository.raydium.layouts import SWAP_LAYOUT
 
@@ -55,10 +56,12 @@ def get_token_account(ctx,
                       mint: Pubkey.from_string):
     try:
         account_data = ctx.get_token_accounts_by_owner(owner, TokenAccountOpts(mint))
+        print(f'TokenAccount {account_data}')
         return account_data.value[0].pubkey, None
     except:
         swap_associated_token_address = get_associated_token_address(owner, mint)
         swap_token_account_Instructions = create_associated_token_account(owner, owner, mint)
+        print(f'SWAP ASSOCIATED TOKEN {swap_associated_token_address}\n\n'f'TOKEN ACCOUNT SWAP INST {swap_token_account_Instructions}')
         return swap_associated_token_address, swap_token_account_Instructions
 
 def sell_get_token_account(ctx,
@@ -82,6 +85,20 @@ def extract_pool_info(pools_list: list, mint: str) -> dict:
     raise Exception(f'{mint} pool not found!')
 
 
+
+def getAccountAMM(mint:str):
+    return Pubkey.find_program_address(
+        [bytes(AMM_PROGRAM_ID), bytes(Pubkey.from_string(mint)), b'amm_associated_seed'],
+        AMM_PROGRAM_ID
+    )[0]
+
+def getAccountPool(mint:str):
+    with CruserSolana() as solana_client:
+        ammAccount = getAccountAMM(mint)
+        print(f'ACCOUNT AMM INFO  {ammAccount}')
+        ammAccountInfo = solana_client.get_account_info_json_parsed(ammAccount).value
+
+
 def fetch_pool_keys(mint: str):
     amm_info = {}
     all_pools = {}
@@ -91,7 +108,7 @@ def fetch_pool_keys(mint: str):
             all_pools = json.load(file)
         amm_info = extract_pool_info(all_pools, mint)
     except:
-        resp = requests.get('https://api.raydium.io/v2/sdk/liquidityx/mainnet.json', stream=True)
+        resp = requests.get('https://api.raydium.io/v2/sdk/liquidity/mainnet.json', stream=True)
         print(f'POOLS DATA {resp.status_code}')
         if resp.status_code == 200:
             pools = resp.json()
@@ -104,6 +121,7 @@ def fetch_pool_keys(mint: str):
                 json.dump(all_pools, file)
             try:
                 amm_info = extract_pool_info(all_pools, mint)
+                print(f'POOLS: %s' % all_pools)
             except:
                 return "failed"
         else:

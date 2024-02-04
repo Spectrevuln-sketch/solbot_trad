@@ -9,6 +9,7 @@ import base58
 import subprocess
 from pybip39 import Mnemonic, Seed
 from solders.keypair import Keypair
+from spl.token.core import MintInfo
 from jsonrpcclient import request, parse, Ok
 from solders.pubkey import Pubkey
 from solders.system_program import CreateAccountParams, TransferParams, transfer
@@ -18,12 +19,14 @@ from spl.token.instructions import initialize_mint, mint_to, InitializeMintParam
 from spl.token.constants import TOKEN_PROGRAM_ID, MINT_LEN, ASSOCIATED_TOKEN_PROGRAM_ID
 from core.connect_solana import CruserSolana, SolThrad
 from core.repository.raydium.buy_swap import BuyToken as raydium_buy
+from core.repository.raydium.create_close_account import get_token_account
 from core.repository.raydium.sell_swap import sellCurrentToken as raydium_sell
 from core.repository.users import GetCurrentUser, CreateUser
 from core.repository.wallet import GetCurrentWallet, NewWalletUser, GetAllCurrentWallet, UpdateWallet
 from dotenv import load_dotenv
 
 from core.utils.amm_selection import select_amm2trade
+from core.utils.metaplex.metadata import  get_metadata, get_edition, get_auction_house
 from core.utils.serializer import serializeJson, findJson, filterJson
 load_dotenv()
 
@@ -42,6 +45,56 @@ class SolanaHandler():
           return False
 
   @classmethod
+  def GetAccountTokenDelegate(cls, tokenAddress, programID):
+    with CruserSolana() as solana_client:
+      tokenDelegated = solana_client.get_token_accounts_by_delegate_json_parsed(Pubkey.from_string(tokenAddress), TokenAccountOpts(program_id=programID))
+      print(f'Token Delegated {tokenDelegated}')
+
+  @classmethod
+  def GetSupply(cls, tokenMint):
+    with CruserSolana() as solana_client:
+      supply = solana_client.get_token_supply(Pubkey.from_string(tokenMint))
+      print(f'supply token {supply}')
+
+  @classmethod
+  def TransferSol(cls, keyPairWallet, toWalletPub, amount):
+    with CruserSolana() as solana_client:
+      walletAccount = solana_client.get_account_info_json_parsed(keyPairWallet.pubkey())
+      print(f'wallet account: %s' % walletAccount)
+      transfer_params = TransferParams(from_pubkey=keyPairWallet.pubkey(), to_pubkey=toWalletPub, lamports=amount * 10**9)
+      transaction_id, blockhash = transfer(solana_client, transfer_params, sender_account)
+
+  @classmethod
+  def CheckReleaseToken(cls, pubkeyToken, ownerToken):
+     with CruserSolana() as solana_client:
+      getMetaData = get_metadata(str(pubkeyToken))
+      if getMetaData is not None:
+        tokenAccount = solana_client.get_token_largest_accounts(pubkeyToken)
+        res = requests.get(getMetaData['data']['uri']).json()
+        getMintAccountInfo = solana_client.get_account_info_json_parsed(pubkeyToken).value
+        if tokenAccount is not None and res is not None:
+          return{
+            "status": "00",
+            "data":{
+              **getMetaData,
+              "tokenData": res,
+              "accountInfo" : getMintAccountInfo.data
+            },
+            "message": "Success get token information"
+          }
+        else:
+          return{
+            'status': '99',
+            'message': 'Token is not available'
+          }
+      else:
+        return{
+            'status': '99',
+            'message': 'Token is not available'
+          }
+
+
+  @classmethod
   def GetAssetsInfo(cls, ownerPub):
     with CruserSolana() as solana_client:
       payload = {
@@ -49,13 +102,14 @@ class SolanaHandler():
           "id": 1,
           "method": "getAssetsByOwner",
           "params": {
-              "ownerAddress": "E645TckHQnDcavVv92Etc6xSWQaq8zzPtPRGBheviRAk",
+              "ownerAddress": str(ownerPub),
               "limit": 10,
               "page": 1
           }
       }
       res = requests.post(os.getenv('SOLANA_URL'), json=payload)
       data = parse(res.json())
+      print(f'DATA ON OWNER ASSETS {data}')
       if isinstance(data, Ok) and solana_client.is_connected() is not False:
         print(f'result data  {data}')
         return data
@@ -137,12 +191,9 @@ class SolanaHandler():
       if findCurrentData is not None:
         for data in findCurrentData:
           pairKeyWallet = Keypair().from_base58_string(data["private_key"])
-          print(f"MY BALANCE: {pairKeyWallet.pubkey()}")
           currBalance = solana_client.get_balance(pairKeyWallet.pubkey()).value
-          print(f"MY BALANCE: {currBalance}")
           balanceAfterRatio = currBalance * (amount_sol_to_invest / 100)
           balence_last = int(currBalance - balanceAfterRatio)
-          print(f'balence_last {balence_last}')
           update={
             "balance": balence_last,
           }
@@ -150,10 +201,17 @@ class SolanaHandler():
           raydiumBuy=True
           while raydiumBuy:
             buyToken = raydium_buy(token_address, pairKeyWallet, amount_sol_to_invest)
+            print(f'Buy token return {buyToken}')
             if buyToken["status"] == 404:
               raydiumBuy=False
               return{
                 "status": 404,
+                "message": buyToken["message"]
+              }
+            else:
+              raydiumBuy=False
+              return{
+                "status": 200,
                 "message": buyToken["message"]
               }
       else:

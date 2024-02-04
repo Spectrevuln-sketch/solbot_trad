@@ -1,6 +1,7 @@
 import json
 import logging
 from core.db_connection import Database, CurserFromConnectionFromPool
+from core.utils.serializer import serializeDB
 
 def GetAllCurrentWallet(tele_id, serialize=False):
     with CurserFromConnectionFromPool() as cursor:
@@ -23,7 +24,22 @@ def GetAllCurrentWallet(tele_id, serialize=False):
                 json_data = json.dumps(wallet_list, indent=2)
                 return json_data
 
-def GetCurrentWallet(tele_id, primary=True):
+def GetCurrentWalletByID(wallet_id, serialize=False):
+    with CurserFromConnectionFromPool() as cursor:
+        query = "SELECT * FROM wallet WHERE id = %s"
+        print(f'Wallet {wallet_id}')
+        cursor.execute(query, (int(wallet_id),))
+        wallet = cursor.fetchone()
+        if wallet is None:
+            return None
+        else:
+            if serialize != True:
+                return wallet
+            else:
+                data = serializeDB(wallet, cursor)
+                return data
+
+def GetCurrentWallet(tele_id, primary=True, serialize=False):
     with CurserFromConnectionFromPool() as cursor:
         query = "SELECT * FROM wallet WHERE tele_id = %s AND \"default\" = %s"
         cursor.execute(query, (str(tele_id), primary))
@@ -33,7 +49,11 @@ def GetCurrentWallet(tele_id, primary=True):
         if wallet is None:
             return None
         else:
-            return wallet
+            if serialize != True:
+                return wallet
+            else:
+                data = serializeDB(wallet, cursor)
+                return data
 
 def NewWalletUser(payload):
     with CurserFromConnectionFromPool() as cursor:
@@ -87,3 +107,21 @@ def CountSnipe(tele_id):
             return None
         else:
             return snipe_wallet[0]
+
+
+def DeleteWallet(wallet_id):
+    with CurserFromConnectionFromPool() as cursor:
+        query= "DELETE FROM wallet WHERE id = %s"
+        cursor.execute(query, (wallet_id,))
+        affected = cursor.rowcount
+        if affected > 0:
+            return {
+                "status": "00",
+                "data": affected,
+                "message": "Success deleting wallet"
+            }
+        else:
+            return {
+                "status": "99",
+                "message": "Cannot delete wallet"
+            }

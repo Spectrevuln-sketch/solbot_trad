@@ -39,6 +39,9 @@ def HandleReply(update: telegram.Update, context:CallbackContext):
       ButtonSniper(update, context, user_info.id, token_address)
       # SolanaHandler.SnipeToken(user_info.id, token_address)
     # if
+    # wallet = GetCurrentWalletByID(walletID, True)
+    #       keypairWallet = Keypair().from_base58_string(wallet['private_key'])
+    #       transferSol = SolanaHandler().TransferSol(keypairWallet)
     if connectWallet:
       print(f'connectWallet here')
       wallet = GetWalletByPrivate(user_reply)
