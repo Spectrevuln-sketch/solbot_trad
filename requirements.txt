@@ -1,0 +1,16 @@
+python-telegram-bot==13.13
+httpx>=0.23.0
+psycopg2==2.9.9
+psycopg2-binary==2.9.9
+python-dotenv==0.19.1
+pycoingecko==1.4.0
+cachetools==4.2.2
+base58==2.1.1
+construct==2.10.68
+Requests==2.31.0
+solana==0.30.2
+solders==0.18.1
+pynacl==1.5.0
+pybip39==0.1.0
+jsonrpcclient==4.0.3
+# spl==0.0.1.dev0

@@ -1,0 +1,7 @@
+{
+  "nuxt.isNuxtApp": false,
+  "cSpell.words": [
+    "keypair"
+  ],
+  "ansible.python.interpreterPath": "/usr/local/bin/python3.12"
+}
