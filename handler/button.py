@@ -311,7 +311,7 @@ def ButtonCallback (update: telegram.Update, context: CallbackContext):
           print(f'AMM PDA {ammPDA}')
           buyToken = SolanaHandler().BuyToken(payload["wallet"], float(convertQuery), payload["token_address"])
           if buyToken["status"] == 404:
-               query.message.reply_text(buyToken["message"])
+              query.message.reply_text(buyToken["message"])
           else:
               query.message.reply_text(buyToken["message"])
       elif sellSearch:
